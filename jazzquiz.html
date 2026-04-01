@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>🎷 Jazz Quiz SNES</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --snes-dark:    #1a0a2e;
+    --snes-purple:  #2d0a6e;
+    --snes-blue:    #0a1a7e;
+    --snes-gold:    #f8c800;
+    --snes-white:   #f0e8ff;
+    --snes-cyan:    #00f8f8;
+    --snes-red:     #f83800;
+    --snes-green:   #00d800;
+    --snes-pink:    #f878f8;
+    --snes-orange:  #f8a800;
+    --snes-silver:  #b8b8d8;
+    --border-col:   #7038f8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+
+  body {
+    background: var(--snes-dark);
+    color: var(--snes-white);
+    font-family: 'Press Start 2P', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Scanlines overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.18) 3px,
+      rgba(0,0,0,0.18) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* Starfield */
+  #starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    background: var(--snes-white);
+    animation: twinkle var(--dur) infinite var(--delay);
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0.1; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.4); }
+  }
+
+  /* Main layout */
+  #app {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  /* SNES panel border mixin */
+  .panel {
+    background: var(--snes-purple);
+    border: 4px solid var(--border-col);
+    box-shadow:
+      0 0 0 2px var(--snes-dark),
+      0 0 0 4px var(--snes-silver),
+      inset 0 0 0 2px rgba(255,255,255,0.08);
+    padding: 16px;
+    position: relative;
+  }
+  .panel::before, .panel::after {
+    content: '✦';
+    position: absolute;
+    font-size: 10px;
+    color: var(--snes-gold);
+    line-height: 1;
+  }
+  .panel::before { top: 4px;  left: 6px; }
+  .panel::after  { top: 4px; right: 6px; }
+
+  /* Header */
+  #header {
+    text-align: center;
+    margin-bottom: 12px;
+    padding: 12px 8px 8px;
+  }
+  #header::before { content: '✦'; bottom: 4px; left: 6px; top: auto; }
+  #header::after  { content: '✦'; bottom: 4px; right: 6px; top: auto; }
+
+  .title-line1 {
+    font-size: 10px;
+    color: var(--snes-cyan);
+    letter-spacing: 4px;
+    display: block;
+    margin-bottom: 8px;
+    text-shadow: 0 0 8px var(--snes-cyan);
+    animation: pulse 2s infinite;
+  }
+  .title-line2 {
+    font-size: 20px;
+    color: var(--snes-gold);
+    text-shadow:
+      3px 3px 0 #a85800,
+      -1px -1px 0 #ffd860;
+    display: block;
+    margin-bottom: 6px;
+    animation: titleBob 3s ease-in-out infinite;
+  }
+  @keyframes titleBob {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-3px); }
+  }
+  .title-sax {
+    font-size: 28px;
+    display: inline-block;
+    animation: sax 1.6s ease-in-out infinite;
+  }
+  @keyframes sax {
+    0%,100% { transform: rotate(-8deg); }
+    50%      { transform: rotate(8deg); }
+  }
+
+  /* Score bar */
+  #scorebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--snes-blue);
+    border: 4px solid var(--border-col);
+    box-shadow: 0 0 0 2px var(--snes-dark), 0 0 0 4px var(--snes-silver);
+  }
+  .score-label {
+    font-size: 8px;
+    color: var(--snes-silver);
+    margin-bottom: 4px;
+  }
+  .score-val {
+    font-size: 18px;
+    color: var(--snes-gold);
+    text-shadow: 2px 2px 0 #a85800;
+    transition: all 0.2s;
+  }
+  .score-val.bump {
+    transform: scale(1.3);
+    color: var(--snes-green);
+  }
+  .level-stars {
+    font-size: 10px;
+    color: var(--snes-gold);
+    letter-spacing: 2px;
+  }
+
+  /* Hint box */
+  #hintPanel {
+    margin-bottom: 12px;
+    min-height: 80px;
+  }
+  .hint-header {
+    font-size: 7px;
+    color: var(--snes-cyan);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--border-col);
+    padding-bottom: 6px;
+  }
+  #hintBox {
+    font-size: 9px;
+    color: var(--snes-white);
+    line-height: 2.2;
+    min-height: 50px;
+  }
+  #hintBox .hint-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 4px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .hint-bullet {
+    color: var(--snes-cyan);
+    flex-shrink: 0;
+  }
+  #resultMsg {
+    font-size: 11px;
+    text-align: center;
+    padding: 8px;
+    animation: flash 0.5s ease;
+  }
+  @keyframes flash {
+    0%   { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* Hint button */
+  #hintBtn {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 12px 8px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    background: #1a1060;
+    color: var(--snes-pink);
+    border: 3px solid var(--snes-pink);
+    box-shadow:
+      0 4px 0 #6a0060,
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.08s;
+    position: relative;
+  }
+  #hintBtn:hover {
+    background: #2a1070;
+    color: #fff;
+  }
+  #hintBtn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #6a0060, inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  #hintBtn::before {
+    content: '▶';
+    margin-right: 8px;
+    color: var(--snes-gold);
+  }
+
+  /* Choices */
+  #choicesPanel { margin-bottom: 12px; }
+  .choices-header {
+    font-size: 7px;
+    color: var(--snes-gold);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--border-col);
+    padding-bottom: 6px;
+  }
+  #choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .choice-btn {
+    padding: 10px 6px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    background: #0a2060;
+    color: var(--snes-white);
+    border: 3px solid #3858c8;
+    box-shadow:
+      0 4px 0 #081430,
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    cursor: pointer;
+    text-align: center;
+    line-height: 1.5;
+    transition: all 0.08s;
+    word-break: break-word;
+  }
+  .choice-btn:hover {
+    background: #1a3880;
+    border-color: var(--snes-cyan);
+    color: var(--snes-cyan);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #081430, inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .choice-btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #081430;
+  }
+  .choice-btn.correct {
+    background: #004000;
+    border-color: var(--snes-green);
+    color: var(--snes-green);
+    animation: correctPulse 0.4s ease;
+  }
+  .choice-btn.wrong {
+    background: #400000;
+    border-color: var(--snes-red);
+    color: var(--snes-red);
+    animation: shake 0.3s ease;
+  }
+  @keyframes correctPulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25%     { transform: translateX(-5px); }
+    75%     { transform: translateX(5px); }
+  }
+
+  /* Footer bar */
+  #footer {
+    text-align: center;
+    font-size: 7px;
+    color: var(--snes-silver);
+    letter-spacing: 2px;
+    margin-top: 8px;
+    animation: pulse 3s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+  }
+
+  /* Point popup */
+  .point-popup {
+    position: fixed;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 900;
+    animation: popUp 0.9s ease-out forwards;
+  }
+  @keyframes popUp {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+  }
+
+  /* Screen flash on correct */
+  .screen-flash {
+    position: fixed;
+    inset: 0;
+    background: var(--snes-gold);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 800;
+    animation: screenFlash 0.3s ease;
+  }
+  @keyframes screenFlash {
+    0%   { opacity: 0.35; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="starfield"></div>
+<div id="app">
+
+  <!-- Header -->
+  <div class="panel" id="header">
+    <span class="title-line1">★ SUPER ★</span>
+    <span class="title-line2"><span class="title-sax">🎷</span> JAZZ QUIZ <span class="title-sax">🎷</span></span>
+    <span style="font-size:7px; color:var(--snes-silver); letter-spacing:2px;">GUESS THE MUSICIAN</span>
+  </div>
+
+  <!-- Score bar -->
+  <div id="scorebar">
+    <div>
+      <div class="score-label">POENG</div>
+      <div class="score-val" id="score">0</div>
+    </div>
+    <div style="text-align:center">
+      <div class="score-label">RUNDE</div>
+      <div class="score-val" id="round">1</div>
+    </div>
+    <div style="text-align:right">
+      <div class="score-label">HINT BRUKT</div>
+      <div class="level-stars" id="hintsUsed">—</div>
+    </div>
+  </div>
+
+  <!-- Hint panel -->
+  <div class="panel" id="hintPanel">
+    <div class="hint-header">▶ LEDETRÅDER</div>
+    <div id="hintBox"></div>
+    <div id="resultMsg"></div>
+  </div>
+
+  <!-- Hint button -->
+  <button id="hintBtn" onclick="getHint()">FÅ NYTT HINT &nbsp;(-2 POENG)</button>
+
+  <!-- Choices -->
+  <div class="panel" id="choicesPanel">
+    <div class="choices-header">★ HVEM ER DET? ★</div>
+    <div id="choices"></div>
+  </div>
+
+  <div id="footer">INSERT COIN TO CONTINUE · JAZZ EDITION</div>
+
+</div>
+
+<script>
+let score = 0;
+let roundNum = 1;
+let current;
+let remainingChoices = [];
+let hintIndex = 0;
+let hintsThisRound = 0;
+let locked = false;
+
+const musicians = [
+  {name:"Miles Davis", hints:["Skapte cool jazz og fusion.","Kind of Blue.","Minimalistisk trompet.","Ledet Coltrane.","Endret stil konstant."]},
+  {name:"John Coltrane", hints:["Sheets of sound.","A Love Supreme.","Modal jazz.","Tenorsaksofon.","Ekstrem improvisasjon."]},
+  {name:"Thelonious Monk", hints:["Dissonant pianostil.","Round Midnight.","Kantete rytmikk.","Bebop-grunnlegger.","Svært unik stil."]},
+  {name:"Charlie Parker", hints:["Kallenavn Bird.","Bebop-skaper.","Altsaksofon.","Hurtig spill.","Endret harmonikk."]},
+  {name:"Jan Garbarek", hints:["ECM-lyd.","Nordisk saksofon.","Jobbet med Shankar.","Luftig spill.","Europeisk jazzikon."]},
+  {name:"Herbie Hancock", hints:["Head Hunters.","Miles Davis band.","Synth pioner.","Jazz-funk.","Grammy-vinner."]},
+  {name:"Pat Metheny", hints:["Melodisk gitar.","42-strengers gitar.","Pat Metheny Group.","Fusion.","Mange Grammy."]},
+  {name:"Esperanza Spalding", hints:["Grammy Best New Artist.","Synger + bass.","Jazz + soul.","Konseptalbum.","Moderne ikon."]},
+  {name:"Charles Mingus", hints:["Mingus Ah Um.","Bass + komponist.","Politisk musikk.","Gospel/blues.","Kraftfull stil."]},
+  {name:"Django Reinhardt", hints:["Gypsy jazz.","To fingre.","Hot Club.","Virtuos gitar.","Legende."]},
+  {name:"Keith Jarrett", hints:["Köln Concert.","Impro solo.","Lyder mens spiller.","Klassisk + jazz.","Unik pianist."]},
+  {name:"Nils Petter Molvær", hints:["Khmer.","Nu jazz.","Elektronisk trompet.","Ambient.","Fusion stil."]},
+  {name:"Wayne Shorter", hints:["Weather Report.","Miles Davis band.","Komponist.","Sopran/tenor sax.","Fusion pioner."]},
+  {name:"Sonny Rollins", hints:["Saxophone Colossus.","Øvde på bro.","Tenorsaksofon.","Lang karriere.","Impro-mester."]},
+  {name:"Bill Evans", hints:["Kind of Blue pianist.","Lyrisk stil.","Trio format.","Moderne harmoni.","Innflytelsesrik pianist."]},
+  {name:"Chet Baker", hints:["Cool jazz.","Synger + trompet.","Lyrisk tone.","West Coast.","Tragisk liv."]},
+  {name:"Ornette Coleman", hints:["Free jazz.","Harmolodics.","Saksofon.","Brøt regler.","Avantgarde."]},
+  {name:"Stan Getz", hints:["Bossa nova.","The Girl from Ipanema.","Tenorsaksofon.","Myk tone.","Cool jazz."]},
+  {name:"Art Blakey", hints:["Jazz Messengers.","Hard bop.","Trommer.","Bandleder.","Oppdaget talenter."]},
+  {name:"Wes Montgomery", hints:["Oktavspill.","Jazzgitar.","Tommel-teknikk.","Smooth tone.","Innflytelsesrik."]},
+  {name:"Chick Corea", hints:["Return to Forever.","Fusion.","Elektrisk piano.","Latin jazz.","Virtuos."]},
+  {name:"Joe Zawinul", hints:["Weather Report.","Synth pioner.","Fusion.","Elektronisk lyd.","Komponist."]},
+  {name:"Dexter Gordon", hints:["Tenorsaksofon.","Hard bop.","Lang tone.","Spilte i Europa.","Film Round Midnight."]},
+  {name:"Gerry Mulligan", hints:["Cool jazz.","Baritonsaksofon.","Pianoløs kvartett.","Arrangør.","West Coast."]},
+  {name:"Dave Brubeck", hints:["Take Five.","Uvanlige taktarter.","Piano.","Cool jazz.","Kvartett."]},
+  {name:"McCoy Tyner", hints:["Coltrane pianist.","Modale akkorder.","Kraftfull stil.","Venstrehånds voicing.","Hard swing."]},
+  {name:"Elvin Jones", hints:["Coltrane trommer.","Polyrhythmikk.","Energi.","Swing.","Innovativ."]},
+  {name:"Ron Carter", hints:["Bass.","Mest innspilte.","Miles Davis.","Walking bass.","Studio-legende."]},
+  {name:"Tony Williams", hints:["Ung trommegeni.","Miles Davis.","Fusion.","Kompleks rytmikk.","Innovatør."]},
+  {name:"Brad Mehldau", hints:["Moderne pianist.","Radiohead covers.","Trio.","Klassisk påvirkning.","Impro."]},
+  {name:"Joshua Redman", hints:["Saksofon.","90-talls stjerne.","Akustisk jazz.","Kvartett.","Teknisk sterk."]},
+  {name:"Avishai Cohen", hints:["Bass.","Israelsk jazz.","Melodisk.","World jazz.","Komponist."]}
+];
+
+// Starfield
+(function(){
+  const sf = document.getElementById('starfield');
+  for(let i=0;i<80;i++){
+    const s = document.createElement('div');
+    s.className='star';
+    const sz = Math.random()<0.3?3:Math.random()<0.5?2:1;
+    s.style.cssText = `width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${1.5+Math.random()*3}s;--delay:${Math.random()*3}s;`;
+    sf.appendChild(s);
+  }
+})();
+
+function startGame(){
+  locked = false;
+  hintsThisRound = 0;
+  current = musicians[Math.floor(Math.random()*musicians.length)];
+  remainingChoices = [...musicians].sort(()=>0.5-Math.random()).slice(0,10);
+  if(!remainingChoices.find(m=>m.name===current.name)) remainingChoices[0]=current;
+  remainingChoices.sort(()=>0.5-Math.random());
+  hintIndex = 0;
+  document.getElementById('resultMsg').innerHTML='';
+  document.getElementById('hintsUsed').textContent='—';
+  render();
+}
+
+function render(){
+  const hb = document.getElementById('hintBox');
+  hb.innerHTML = current.hints.slice(0,hintIndex+1).map((h,i)=>
+    `<div class="hint-item"><span class="hint-bullet">▶</span><span>${h}</span></div>`
+  ).join('');
+
+  const div = document.getElementById('choices');
+  div.innerHTML='';
+  remainingChoices.forEach(m=>{
+    const btn=document.createElement('button');
+    btn.className='choice-btn';
+    btn.textContent=m.name;
+    btn.onclick=()=>guess(m.name, btn);
+    div.appendChild(btn);
+  });
+}
+
+function getHint(){
+  if(locked) return;
+  if(hintIndex < current.hints.length-1){
+    hintIndex++;
+    hintsThisRound++;
+    score -= 2;
+    updateScore();
+    document.getElementById('hintsUsed').textContent='★'.repeat(hintsThisRound);
+    removeWrongChoice();
+    render();
+  }
+}
+
+function removeWrongChoice(){
+  const wrongs = remainingChoices.filter(m=>m.name!==current.name);
+  if(wrongs.length>0){
+    const remove = wrongs[Math.floor(Math.random()*wrongs.length)];
+    remainingChoices = remainingChoices.filter(m=>m.name!==remove.name);
+  }
+}
+
+function guess(name, btn){
+  if(locked) return;
+  if(name===current.name){
+    locked=true;
+    btn.classList.add('correct');
+    const pts = Math.max(1, 30-hintIndex*5);
+    score += pts;
+    updateScore(true);
+    roundNum++;
+    document.getElementById('round').textContent=roundNum;
+    showPointPopup('+'+pts, 'var(--snes-green)');
+    showFlash();
+    document.getElementById('resultMsg').innerHTML =
+      `<span style="color:var(--snes-green)">✔ RIKTIG! +${pts} POENG</span>`;
+    setTimeout(()=>startGame(), 1400);
+  } else {
+    btn.classList.add('wrong');
+    score -= 8;
+    updateScore();
+    showPointPopup('-8', 'var(--snes-red)');
+    document.getElementById('resultMsg').innerHTML =
+      `<span style="color:var(--snes-red)">✘ FEIL! -8 POENG</span>`;
+    setTimeout(()=>{ btn.classList.remove('wrong'); document.getElementById('resultMsg').innerHTML=''; }, 900);
+  }
+}
+
+function updateScore(bump){
+  const el = document.getElementById('score');
+  el.textContent = score;
+  if(bump){ el.classList.add('bump'); setTimeout(()=>el.classList.remove('bump'),300); }
+}
+
+function showPointPopup(text, color){
+  const p = document.createElement('div');
+  p.className='point-popup';
+  p.style.cssText=`color:${color};text-shadow:2px 2px 0 rgba(0,0,0,0.6);top:40%;left:50%;transform:translateX(-50%);`;
+  p.textContent=text;
+  document.body.appendChild(p);
+  setTimeout(()=>p.remove(), 900);
+}
+
+function showFlash(){
+  const f = document.createElement('div');
+  f.className='screen-flash';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(), 300);
+}
+
+startGame();
+</script>
+</body>
+</html>
