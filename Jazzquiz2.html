@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>🎷 Jazz Quiz SNES</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root {
+  --dark:   #1a0a2e;
+  --purple: #2d0a6e;
+  --blue:   #0a1a7e;
+  --gold:   #f8c800;
+  --white:  #f0e8ff;
+  --cyan:   #00f8f8;
+  --red:    #f83800;
+  --green:  #00d800;
+  --pink:   #f878f8;
+  --silver: #b8b8d8;
+  --bord:   #7038f8;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--dark);
+  color:var(--white);
+  font-family:'Press Start 2P',monospace;
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative;
+}
+body::after {
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(0,0,0,0.18) 3px,rgba(0,0,0,0.18) 4px);
+  pointer-events:none;z-index:999;
+}
+#starfield { position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none; }
+.star { position:absolute;background:var(--white);animation:twinkle var(--dur) infinite var(--delay); }
+@keyframes twinkle { 0%,100%{opacity:.1;transform:scale(1)} 50%{opacity:1;transform:scale(1.5)} }
+
+.screen { display:none;position:relative;z-index:1;max-width:640px;margin:0 auto;padding:16px; }
+.screen.active { display:block; }
+
+.panel {
+  background:var(--purple);
+  border:4px solid var(--bord);
+  box-shadow:0 0 0 2px var(--dark),0 0 0 4px var(--silver),inset 0 0 0 2px rgba(255,255,255,.08);
+  padding:16px;
+  position:relative;
+  margin-bottom:12px;
+}
+.panel::before,.panel::after { content:'✦';position:absolute;font-size:10px;color:var(--gold);line-height:1; }
+.panel::before { top:4px;left:6px; }
+.panel::after  { top:4px;right:6px; }
+
+.panel-hdr { font-size:7px;letter-spacing:2px;margin-bottom:10px;border-bottom:2px solid var(--bord);padding-bottom:6px; }
+.hdr-cyan { color:var(--cyan); }
+.hdr-gold { color:var(--gold); }
+
+@keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.3} }
+@keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes titleBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes sax    { 0%,100%{transform:rotate(-10deg)} 50%{transform:rotate(10deg)} }
+@keyframes fadeIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+@keyframes flash  { 0%{transform:scale(1.2)} 100%{transform:scale(1)} }
+@keyframes correctPulse { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
+@keyframes shake  { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+@keyframes popUp  { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-70px) scale(1.5)} }
+@keyframes sflash { 0%{opacity:.35} 100%{opacity:0} }
+
+/* ── TITLE ── */
+#titleScreen { text-align:center;padding-top:10px; }
+.title-badge {
+  font-size:9px;color:var(--cyan);letter-spacing:4px;
+  border:2px solid var(--cyan);display:inline-block;
+  padding:6px 14px;margin-bottom:16px;
+  animation:pulse 2s infinite;
+}
+.big-title {
+  font-size:26px;color:var(--gold);line-height:1.6;
+  text-shadow:4px 4px 0 #7a5800,-1px -1px 0 #ffd860;
+  animation:titleBob 3s ease-in-out infinite;
+}
+.big-sax   { display:inline-block;animation:sax 1.6s ease-in-out infinite; }
+.sub-title { font-size:7px;color:var(--silver);letter-spacing:3px;margin-top:6px; }
+.deco-line {
+  border-top:2px solid var(--bord);border-bottom:2px solid var(--bord);
+  padding:8px 0;margin:14px 0;font-size:8px;color:var(--silver);letter-spacing:2px;
+}
+.press-start { font-size:11px;color:var(--gold);letter-spacing:2px;margin:20px 0 16px;animation:blink 1s step-end infinite; }
+
+.hs-tbl { width:100%;border-collapse:collapse;margin-top:6px; }
+.hs-tbl td { padding:6px 4px;font-size:8px;border-bottom:1px solid rgba(112,56,248,.4); }
+.hs-rank { color:var(--gold);width:32px; }
+.hs-name { color:var(--cyan);text-align:left; }
+.hs-pts  { color:var(--pink);text-align:right; }
+.hs-new  { color:var(--green);animation:blink .7s step-end infinite; }
+.hs-hdr  { font-size:8px;color:var(--gold);letter-spacing:3px;margin-bottom:8px;text-align:center; }
+
+.start-btn {
+  display:block;width:100%;margin:8px 0;padding:14px;
+  font-family:'Press Start 2P',monospace;font-size:11px;
+  background:var(--blue);color:var(--gold);
+  border:3px solid var(--gold);
+  box-shadow:0 5px 0 #5a4000,inset 0 1px 0 rgba(255,255,255,.08);
+  cursor:pointer;letter-spacing:2px;transition:all .08s;
+}
+.start-btn::before { content:'▶ ';color:var(--cyan); }
+.start-btn:hover   { background:#1a3090;color:#fff;border-color:#fff; }
+.start-btn:active  { transform:translateY(4px);box-shadow:0 1px 0 #5a4000; }
+
+/* ── SCOREBAR ── */
+#scorebar {
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px;padding:10px 14px;
+  background:var(--blue);
+  border:4px solid var(--bord);
+  box-shadow:0 0 0 2px var(--dark),0 0 0 4px var(--silver);
+}
+.sbar-lbl { font-size:7px;color:var(--silver);margin-bottom:4px; }
+.sbar-val { font-size:16px;color:var(--gold);text-shadow:2px 2px 0 #7a5800;transition:all .2s; }
+.sbar-val.bump { transform:scale(1.3);color:var(--green); }
+.pips { display:flex;gap:4px;margin-top:4px; }
+.pip { width:12px;height:12px;border:2px solid var(--silver); }
+.pip.done   { background:var(--gold);border-color:var(--gold); }
+.pip.active { background:var(--cyan);border-color:var(--cyan);animation:pulse .8s infinite; }
+
+/* ── HINTS / CHOICES ── */
+#hintBox { font-size:9px;line-height:2.2;min-height:50px; }
+.hint-item { display:flex;gap:8px;align-items:flex-start;margin-bottom:4px;animation:fadeIn .3s ease; }
+.hbullet   { color:var(--cyan);flex-shrink:0; }
+#resultMsg { font-size:10px;text-align:center;padding:8px;min-height:28px;animation:flash .4s ease; }
+
+#hintBtn {
+  width:100%;margin-bottom:12px;padding:12px 8px;
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  background:#1a1060;color:var(--pink);
+  border:3px solid var(--pink);
+  box-shadow:0 4px 0 #6a0060,inset 0 1px 0 rgba(255,255,255,.1);
+  cursor:pointer;letter-spacing:1px;transition:all .08s;
+}
+#hintBtn::before { content:'▶ ';color:var(--gold); }
+#hintBtn:hover   { background:#2a1070;color:#fff; }
+#hintBtn:active  { transform:translateY(3px);box-shadow:0 1px 0 #6a0060; }
+
+#choices { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.choice-btn {
+  padding:10px 6px;
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  background:#0a2060;color:var(--white);
+  border:3px solid #3858c8;
+  box-shadow:0 4px 0 #081430,inset 0 1px 0 rgba(255,255,255,.1);
+  cursor:pointer;text-align:center;line-height:1.6;
+  transition:all .08s;word-break:break-word;
+}
+.choice-btn:hover   { background:#1a3880;border-color:var(--cyan);color:var(--cyan);transform:translateY(-2px);box-shadow:0 6px 0 #081430; }
+.choice-btn:active  { transform:translateY(3px);box-shadow:0 1px 0 #081430; }
+.choice-btn.correct { background:#004000;border-color:var(--green);color:var(--green);animation:correctPulse .4s ease; }
+.choice-btn.wrong   { background:#400000;border-color:var(--red);color:var(--red);animation:shake .3s ease; }
+
+/* ── SUMMARY ── */
+#summaryScreen { text-align:center; }
+.sum-big  { font-size:18px;color:var(--gold);text-shadow:3px 3px 0 #7a5800;margin-bottom:16px;animation:titleBob 2s infinite; }
+.sum-pts  { font-size:28px;color:var(--cyan);text-shadow:2px 2px 0 #007878;margin:8px 0; }
+.sum-row  { display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px solid rgba(112,56,248,.4);font-size:8px; }
+.sum-row .lbl { color:var(--silver); }
+.sum-row .val { color:var(--gold); }
+
+/* ── NAME ENTRY ── */
+.name-lbl { font-size:9px;color:var(--cyan);letter-spacing:2px;margin-bottom:12px; }
+.name-disp {
+  font-size:20px;color:var(--gold);letter-spacing:8px;
+  border-bottom:3px solid var(--gold);display:inline-block;
+  padding:6px 16px;margin-bottom:12px;min-width:160px;text-align:center;
+}
+.cur { animation:blink .6s step-end infinite; }
+.char-grid { display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-bottom:12px; }
+.char-btn {
+  width:28px;height:28px;
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  background:#0a2060;color:var(--white);border:2px solid #3858c8;cursor:pointer;transition:all .08s;
+}
+.char-btn:hover  { background:var(--bord);border-color:var(--cyan);color:var(--cyan); }
+.char-btn:active { transform:scale(.92); }
+.ctrl-row { display:flex;gap:8px;justify-content:center;margin-bottom:12px; }
+.ctrl-btn {
+  padding:8px 14px;
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  cursor:pointer;border:3px solid;transition:all .08s;
+}
+.ctrl-btn:active { transform:translateY(2px); }
+.btn-del { background:#200010;color:var(--red);border-color:var(--red);box-shadow:0 3px 0 #600000; }
+.btn-ok  { background:#002000;color:var(--green);border-color:var(--green);box-shadow:0 3px 0 #006000; }
+.btn-del:hover { background:#400020; }
+.btn-ok:hover  { background:#004000; }
+
+/* ── FX ── */
+.pt-pop {
+  position:fixed;font-family:'Press Start 2P',monospace;font-size:16px;
+  pointer-events:none;z-index:900;text-shadow:2px 2px 0 rgba(0,0,0,.7);
+  animation:popUp .9s ease-out forwards;
+}
+.scr-flash { position:fixed;inset:0;background:var(--gold);opacity:0;pointer-events:none;z-index:800;animation:sflash .3s ease; }
+
+.footer-txt { text-align:center;font-size:6px;color:var(--silver);letter-spacing:2px;margin-top:8px;animation:pulse 3s infinite; }
+.copyright  { font-size:6px;color:var(--silver);letter-spacing:2px;margin-top:12px;opacity:.5; }
+</style>
+</head>
+<body>
+<div id="starfield"></div>
+
+<!-- ════════════ TITLE SCREEN ════════════ -->
+<div id="titleScreen" class="screen active">
+  <div class="title-badge">★ SUPER NINTENDO ★</div>
+
+  <div class="panel" style="text-align:center;padding:20px 16px">
+    <div class="big-title">
+      <span class="big-sax">🎷</span> JAZZ <span class="big-sax">🎷</span>
+    </div>
+    <div style="font-size:20px;color:var(--cyan);text-shadow:2px 2px 0 #007878;margin-bottom:6px">QUIZ</div>
+    <div class="sub-title">MUSICIAN MASTER EDITION</div>
+    <div class="deco-line">♩ ♪ ♫ ♬ ♩ ♪ ♫ ♬ ♩ ♪ ♫ ♬</div>
+    <div style="font-size:7px;color:var(--silver);line-height:2.4;text-align:left">
+      <span style="color:var(--cyan)">REGLER:</span><br>
+      ▶ 5 runder — gjett musikeren<br>
+      ▶ Hint koster <span style="color:var(--red)">-2 pts</span> per gang<br>
+      ▶ Feil svar koster <span style="color:var(--red)">-8 pts</span><br>
+      ▶ Raskere = flere poeng (maks 30)
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hs-hdr">🏆 HIGH SCORES 🏆</div>
+    <table class="hs-tbl" id="titleHsTable"></table>
+  </div>
+
+  <div class="press-start">— TRYKK START —</div>
+  <button class="start-btn" onclick="startGame()">START SPILLET</button>
+  <div class="copyright">© 2025 JAZZ QUIZ INC. · 1 PLAYER ONLY</div>
+</div>
+
+<!-- ════════════ GAME SCREEN ════════════ -->
+<div id="gameScreen" class="screen">
+  <div id="scorebar">
+    <div>
+      <div class="sbar-lbl">POENG</div>
+      <div class="sbar-val" id="scoreDisp">0</div>
+    </div>
+    <div style="text-align:center">
+      <div class="sbar-lbl">RUNDE</div>
+      <div class="sbar-val" id="roundDisp">1/5</div>
+      <div class="pips" id="pips"></div>
+    </div>
+    <div style="text-align:right">
+      <div class="sbar-lbl">HINT</div>
+      <div style="font-size:12px;color:var(--gold)" id="hintStars">—</div>
+    </div>
+  </div>
+
+  <div class="panel" id="hintPanel" style="min-height:100px">
+    <div class="panel-hdr hdr-cyan">▶ LEDETRÅDER</div>
+    <div id="hintBox"></div>
+    <div id="resultMsg"></div>
+  </div>
+
+  <button id="hintBtn" onclick="getHint()">FÅ NYTT HINT &nbsp;(-2 POENG)</button>
+
+  <div class="panel">
+    <div class="panel-hdr hdr-gold">★ HVEM ER DET? ★</div>
+    <div id="choices"></div>
+  </div>
+
+  <div class="footer-txt">SUPER JAZZ QUIZ · 5 RUNDER</div>
+</div>
+
+<!-- ════════════ SUMMARY SCREEN ════════════ -->
+<div id="summaryScreen" class="screen">
+  <div class="panel" style="text-align:center">
+    <div class="sum-big" id="sumTitle">SPILLET ER OVER!</div>
+    <div style="font-size:8px;color:var(--silver)">TOTAL POENGSUM</div>
+    <div class="sum-pts" id="sumScore"></div>
+    <div id="sumGrade" style="margin-top:8px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hdr hdr-gold">★ RUNDE FOR RUNDE ★</div>
+    <div id="roundBreakdown"></div>
+  </div>
+
+  <!-- Name entry (shown if qualifies) -->
+  <div class="panel" id="hsEntryPanel" style="text-align:center">
+    <div class="panel-hdr hdr-cyan" style="text-align:center">🏆 HIGH SCORE! SKRIV NAVN 🏆</div>
+    <div class="name-lbl">MAKS 6 TEGN</div>
+    <div class="name-disp" id="nameDisp"></div>
+    <div class="char-grid" id="charGrid"></div>
+    <div class="ctrl-row">
+      <button class="ctrl-btn btn-del" onclick="deleteLetter()">◀ SLETT</button>
+      <button class="ctrl-btn btn-ok"  onclick="submitScore()">LAGRE ✔</button>
+    </div>
+  </div>
+
+  <!-- After submission -->
+  <div id="afterEntry" style="display:none">
+    <div class="panel">
+      <div class="hs-hdr">🏆 HIGH SCORES 🏆</div>
+      <table class="hs-tbl" id="postHsTable"></table>
+    </div>
+    <button class="start-btn" onclick="goTitle()">TILBAKE TIL START</button>
+  </div>
+
+  <!-- No HS (shown if doesn't qualify) -->
+  <div id="noHsPanel" style="display:none">
+    <div class="panel">
+      <div class="hs-hdr">🏆 HIGH SCORES 🏆</div>
+      <table class="hs-tbl" id="noHsTable"></table>
+    </div>
+    <button class="start-btn" onclick="goTitle()">TILBAKE TIL START</button>
+  </div>
+</div>
+
+<script>
+const MUSICIANS = [
+  {name:"Miles Davis",        hints:["Skapte cool jazz og fusion.","Kind of Blue.","Minimalistisk trompet.","Ledet Coltrane.","Endret stil konstant."]},
+  {name:"John Coltrane",      hints:["Sheets of sound.","A Love Supreme.","Modal jazz.","Tenorsaksofon.","Ekstrem improvisasjon."]},
+  {name:"Thelonious Monk",    hints:["Dissonant pianostil.","Round Midnight.","Kantete rytmikk.","Bebop-grunnlegger.","Svært unik stil."]},
+  {name:"Charlie Parker",     hints:["Kallenavn Bird.","Bebop-skaper.","Altsaksofon.","Hurtig spill.","Endret harmonikk."]},
+  {name:"Jan Garbarek",       hints:["ECM-lyd.","Nordisk saksofon.","Jobbet med Shankar.","Luftig spill.","Europeisk jazzikon."]},
+  {name:"Herbie Hancock",     hints:["Head Hunters.","Miles Davis band.","Synth pioner.","Jazz-funk.","Grammy-vinner."]},
+  {name:"Pat Metheny",        hints:["Melodisk gitar.","42-strengers gitar.","Pat Metheny Group.","Fusion.","Mange Grammy."]},
+  {name:"Esperanza Spalding", hints:["Grammy Best New Artist.","Synger + bass.","Jazz + soul.","Konseptalbum.","Moderne ikon."]},
+  {name:"Charles Mingus",     hints:["Mingus Ah Um.","Bass + komponist.","Politisk musikk.","Gospel/blues.","Kraftfull stil."]},
+  {name:"Django Reinhardt",   hints:["Gypsy jazz.","To fingre.","Hot Club.","Virtuos gitar.","Legende."]},
+  {name:"Keith Jarrett",      hints:["Köln Concert.","Impro solo.","Lyder mens spiller.","Klassisk + jazz.","Unik pianist."]},
+  {name:"Nils Petter Molvær", hints:["Khmer.","Nu jazz.","Elektronisk trompet.","Ambient.","Fusion stil."]},
+  {name:"Wayne Shorter",      hints:["Weather Report.","Miles Davis band.","Komponist.","Sopran/tenor sax.","Fusion pioner."]},
+  {name:"Sonny Rollins",      hints:["Saxophone Colossus.","Øvde på bro.","Tenorsaksofon.","Lang karriere.","Impro-mester."]},
+  {name:"Bill Evans",         hints:["Kind of Blue pianist.","Lyrisk stil.","Trio format.","Moderne harmoni.","Innflytelsesrik pianist."]},
+  {name:"Chet Baker",         hints:["Cool jazz.","Synger + trompet.","Lyrisk tone.","West Coast.","Tragisk liv."]},
+  {name:"Ornette Coleman",    hints:["Free jazz.","Harmolodics.","Saksofon.","Brøt regler.","Avantgarde."]},
+  {name:"Stan Getz",          hints:["Bossa nova.","The Girl from Ipanema.","Tenorsaksofon.","Myk tone.","Cool jazz."]},
+  {name:"Art Blakey",         hints:["Jazz Messengers.","Hard bop.","Trommer.","Bandleder.","Oppdaget talenter."]},
+  {name:"Wes Montgomery",     hints:["Oktavspill.","Jazzgitar.","Tommel-teknikk.","Smooth tone.","Innflytelsesrik."]},
+  {name:"Chick Corea",        hints:["Return to Forever.","Fusion.","Elektrisk piano.","Latin jazz.","Virtuos."]},
+  {name:"Joe Zawinul",        hints:["Weather Report.","Synth pioner.","Fusion.","Elektronisk lyd.","Komponist."]},
+  {name:"Dexter Gordon",      hints:["Tenorsaksofon.","Hard bop.","Lang tone.","Spilte i Europa.","Film Round Midnight."]},
+  {name:"Gerry Mulligan",     hints:["Cool jazz.","Baritonsaksofon.","Pianoløs kvartett.","Arrangør.","West Coast."]},
+  {name:"Dave Brubeck",       hints:["Take Five.","Uvanlige taktarter.","Piano.","Cool jazz.","Kvartett."]},
+  {name:"McCoy Tyner",        hints:["Coltrane pianist.","Modale akkorder.","Kraftfull stil.","Venstrehånds voicing.","Hard swing."]},
+  {name:"Elvin Jones",        hints:["Coltrane trommer.","Polyrhythmikk.","Energi.","Swing.","Innovativ."]},
+  {name:"Ron Carter",         hints:["Bass.","Mest innspilte.","Miles Davis.","Walking bass.","Studio-legende."]},
+  {name:"Tony Williams",      hints:["Ung trommegeni.","Miles Davis.","Fusion.","Kompleks rytmikk.","Innovatør."]},
+  {name:"Brad Mehldau",       hints:["Moderne pianist.","Radiohead covers.","Trio.","Klassisk påvirkning.","Impro."]},
+  {name:"Joshua Redman",      hints:["Saksofon.","90-talls stjerne.","Akustisk jazz.","Kvartett.","Teknisk sterk."]},
+  {name:"Avishai Cohen",      hints:["Bass.","Israelsk jazz.","Melodisk.","World jazz.","Komponist."]}
+];
+
+const CHARS   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+const MAX_NM  = 6;
+const ROUNDS  = 5;
+const HS_KEY  = 'jazzQuiz_hs_v1';
+
+let score, curRound, roundLog, usedNames;
+let current, choices, hintIdx, hintsRound, locked;
+let enteredName;
+
+/* ── HIGH SCORES ── */
+function loadHS()      { try{ return JSON.parse(localStorage.getItem(HS_KEY))||[]; }catch(e){ return []; } }
+function saveHS(arr)   { try{ localStorage.setItem(HS_KEY,JSON.stringify(arr)); }catch(e){} }
+function qualifiesHS(s){ const l=loadHS(); return l.length<10||s>(l[l.length-1]?.score??0); }
+function insertHS(n,s) {
+  let l=loadHS(); l.push({name:n,score:s}); l.sort((a,b)=>b.score-a.score); l=l.slice(0,10); saveHS(l); return l;
+}
+function renderHS(tblId, hlName) {
+  const l=loadHS(), tbl=document.getElementById(tblId);
+  if(!l.length){ tbl.innerHTML='<tr><td colspan="3" style="color:var(--silver);font-size:8px;text-align:center;padding:8px">INGEN SCORES ENNÅ</td></tr>'; return; }
+  const hlIdx = hlName ? l.findIndex(e=>e.name===hlName) : -1;
+  tbl.innerHTML = l.map((e,i)=>`
+    <tr>
+      <td class="hs-rank">${i===0?'👑':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
+      <td class="hs-name ${i===hlIdx?'hs-new':''}">${e.name}</td>
+      <td class="hs-pts">${e.score} PTS</td>
+    </tr>`).join('');
+}
+
+/* ── STARS ── */
+(()=>{
+  const sf=document.getElementById('starfield');
+  for(let i=0;i<90;i++){
+    const s=document.createElement('div'); s.className='star';
+    const z=Math.random()<.3?3:Math.random()<.5?2:1;
+    s.style.cssText=`width:${z}px;height:${z}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${1.5+Math.random()*3}s;--delay:${Math.random()*3}s`;
+    sf.appendChild(s);
+  }
+})();
+
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo(0,0); }
+
+/* ── TITLE ── */
+function goTitle(){ renderHS('titleHsTable'); show('titleScreen'); }
+
+/* ── GAME START ── */
+function startGame(){
+  score=0; curRound=0; roundLog=[]; usedNames=[];
+  show('gameScreen'); newRound();
+}
+
+function newRound(){
+  locked=false; hintsRound=0; hintIdx=0;
+  document.getElementById('resultMsg').innerHTML='';
+  document.getElementById('hintStars').textContent='—';
+
+  const pool=MUSICIANS.filter(m=>!usedNames.includes(m.name));
+  current=pool[Math.floor(Math.random()*pool.length)];
+  usedNames.push(current.name);
+
+  choices=[...MUSICIANS].sort(()=>0.5-Math.random()).slice(0,10);
+  if(!choices.find(m=>m.name===current.name)) choices[0]=current;
+  choices.sort(()=>0.5-Math.random());
+
+  updScore(); updRound(); renderRound();
+}
+
+function updScore(bump){
+  const el=document.getElementById('scoreDisp'); el.textContent=score;
+  if(bump){el.classList.add('bump');setTimeout(()=>el.classList.remove('bump'),300);}
+}
+function updRound(){
+  document.getElementById('roundDisp').textContent=(curRound+1)+'/'+ROUNDS;
+  document.getElementById('pips').innerHTML=Array.from({length:ROUNDS},(_,i)=>{
+    const c=i<curRound?'done':i===curRound?'active':''; return `<div class="pip ${c}"></div>`;
+  }).join('');
+}
+function renderRound(){
+  document.getElementById('hintBox').innerHTML=
+    current.hints.slice(0,hintIdx+1).map(h=>
+      `<div class="hint-item"><span class="hbullet">▶</span><span>${h}</span></div>`).join('');
+  const div=document.getElementById('choices'); div.innerHTML='';
+  choices.forEach(m=>{
+    const b=document.createElement('button'); b.className='choice-btn'; b.textContent=m.name;
+    b.onclick=()=>guess(m.name,b); div.appendChild(b);
+  });
+}
+
+function getHint(){
+  if(locked||hintIdx>=current.hints.length-1) return;
+  hintIdx++; hintsRound++; score-=2; updScore();
+  document.getElementById('hintStars').textContent='★'.repeat(hintsRound);
+  const wrongs=choices.filter(m=>m.name!==current.name);
+  if(wrongs.length) choices=choices.filter(m=>m.name!==wrongs[Math.floor(Math.random()*wrongs.length)].name);
+  renderRound();
+}
+
+function guess(name,btn){
+  if(locked) return;
+  if(name===current.name){
+    locked=true; btn.classList.add('correct');
+    const pts=Math.max(1,30-hintIdx*5);
+    score+=pts; curRound++;
+    roundLog.push({musician:current.name, pts, hints:hintsRound});
+    updScore(true); fx('+'+pts,'#00d800'); flash();
+    document.getElementById('resultMsg').innerHTML=`<span style="color:var(--green)">✔ RIKTIG! +${pts}</span>`;
+    setTimeout(()=>{ curRound>=ROUNDS ? showSummary() : newRound(); },1300);
+  } else {
+    btn.classList.add('wrong'); score-=8; updScore(); fx('-8','#f83800');
+    document.getElementById('resultMsg').innerHTML=`<span style="color:var(--red)">✘ FEIL! -8 POENG</span>`;
+    setTimeout(()=>{ btn.classList.remove('wrong'); document.getElementById('resultMsg').innerHTML=''; },900);
+  }
+}
+
+/* ── SUMMARY ── */
+function grade(s){
+  if(s>=140) return ['🏆','JAZZLEGENDE!','var(--gold)'];
+  if(s>=110) return ['🎷','JAZZMESTER','var(--cyan)'];
+  if(s>=80)  return ['⭐','JAZZ-ENTUSIAST','var(--pink)'];
+  if(s>=50)  return ['🎵','JAZZ-ELEV','var(--silver)'];
+  return ['🎹','BEGYNNER','var(--silver)'];
+}
+function showSummary(){
+  show('summaryScreen');
+  document.getElementById('sumScore').textContent=score+' PTS';
+  const [ic,tx,co]=grade(score);
+  document.getElementById('sumGrade').innerHTML=`<span style="font-size:22px">${ic}</span><br><span style="font-size:9px;color:${co};letter-spacing:2px">${tx}</span>`;
+  document.getElementById('roundBreakdown').innerHTML=roundLog.map((r,i)=>
+    `<div class="sum-row">
+       <span class="lbl">RND ${i+1}: ${r.musician.toUpperCase()}</span>
+       <span class="val">${r.pts>0?'+':''}${r.pts}${r.hints?' ('+r.hints+' hint)':''}</span>
+     </div>`).join('');
+
+  const qualifies=qualifiesHS(score);
+  document.getElementById('hsEntryPanel').style.display = qualifies?'block':'none';
+  document.getElementById('afterEntry').style.display   = 'none';
+  document.getElementById('noHsPanel').style.display    = qualifies?'none':'block';
+
+  if(qualifies){ enteredName=''; buildChars(); updNameDisp(); }
+  else { renderHS('noHsTable'); }
+}
+
+/* ── NAME ENTRY ── */
+function buildChars(){
+  document.getElementById('charGrid').innerHTML=CHARS.map(c=>
+    `<button class="char-btn" onclick="addLetter('${c}')">${c}</button>`).join('');
+}
+function updNameDisp(){
+  const el=document.getElementById('nameDisp');
+  el.innerHTML=enteredName.padEnd(MAX_NM,'_').split('').map((c,i)=>
+    i===enteredName.length
+      ?`<span class="cur" style="color:var(--cyan)">${c}</span>`
+      :`<span style="color:${c==='_'?'rgba(248,200,0,.3)':'var(--gold)'}">${c}</span>`
+  ).join('');
+}
+function addLetter(c){ if(enteredName.length<MAX_NM){ enteredName+=c; updNameDisp(); } }
+function deleteLetter(){ if(enteredName.length>0){ enteredName=enteredName.slice(0,-1); updNameDisp(); } }
+function submitScore(){
+  const nm=enteredName.trim()||'ANON';
+  insertHS(nm,score);
+  document.getElementById('hsEntryPanel').style.display='none';
+  document.getElementById('afterEntry').style.display='block';
+  renderHS('postHsTable',nm);
+}
+
+/* ── FX ── */
+function fx(txt,col){
+  const p=document.createElement('div'); p.className='pt-pop';
+  p.style.cssText=`color:${col};top:38%;left:50%;transform:translateX(-50%)`;
+  p.textContent=txt; document.body.appendChild(p); setTimeout(()=>p.remove(),900);
+}
+function flash(){
+  const f=document.createElement('div'); f.className='scr-flash';
+  document.body.appendChild(f); setTimeout(()=>f.remove(),300);
+}
+
+goTitle();
+</script>
+</body>
+</html>
